@@ -53,4 +53,23 @@ public class Test2_evaluate {
         log.info("result:{},{}", 5 * Math.pow(-11, 2), evaluate.evaluate("5*-11^a"));
     }
 
+    @Test
+    public void test_assign() {
+        Evaluate evaluate = new Evaluate();
+//        log.info("result:{},{}", evaluate.evaluate("(5*((0-11)^2))"), evaluate.evaluate("(5*((0-11)@c^2)@b)@a"));
+        int a = 9;
+        evaluate.putVar("a", new BigDecimal(9));
+        int x = 1 + 1, y = 2 + a;
+        log.info("result={},{};{}", x, y, evaluate.evaluate("x=1+1,y=2+a"));
+        log.info("vars={}", evaluate.getVars());
+        int i = 1 + 2, j = i * 3, k = (j - 1) * 2;
+        log.info("result={},{},{};{}", i, j, k, evaluate.evaluate("i=1+2,j=i*3,k=(j-1)*2"));
+        log.info("vars={}", evaluate.getVars());
+        int s;
+        int q = (1 + 5 * (s = (1 + x)));
+        log.info("result={},{};{}", q, s, evaluate.evaluate("q=(1+5*s=(1+x))"));
+        log.info("vars={}", evaluate.getVars());
+
+    }
+
 }
