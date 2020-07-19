@@ -1,5 +1,6 @@
 package cn.zouyijiang.algorithems;
 
+import edu.princeton.cs.algs4.StdDraw;
 import edu.princeton.cs.algs4.StdIn;
 import edu.princeton.cs.algs4.StdOut;
 import lombok.extern.slf4j.Slf4j;
@@ -30,5 +31,19 @@ public class Test1_algs4_jar {
         double c = StdIn.readDouble();
         StdOut.println("Your double was: " + c);
         StdOut.println();
+    }
+
+    @Test
+    public void test_draw() {
+
+        StdDraw.point(0.2, 0.4);
+        StdDraw.circle(0.2, 0.4, 0.05);
+        StdDraw.line(0.1, 0.1, 0.8, 0.8);
+        StdDraw.show(5);
+        StdDraw.clear();
+        StdDraw.point(0.2, 0.8);
+        StdDraw.circle(0.2, 0.8, 0.05);
+        StdDraw.line(0.1, 0.8, 0.3, 0.8);
+        StdDraw.show(10);
     }
 }
