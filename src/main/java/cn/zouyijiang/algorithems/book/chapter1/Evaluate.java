@@ -38,7 +38,8 @@ public class Evaluate {
         BRACKET("括号"),
         EXPR("表达式"),
         VAR("变量"),
-        ASSIGN("赋值"); // 右结合
+        ASSIGN("赋值"), // 右结合
+        END("赋值"); // 结束符号
 
         private final String name;
     }
@@ -52,6 +53,8 @@ public class Evaluate {
         private int rowBegin;
         private int rowEnd;
         private List<Node> children;
+
+        private List<String> assignVars;
 //        private Node left;
 //        private Node right;
 
@@ -97,6 +100,7 @@ public class Evaluate {
     private static final boolean[] symbols_var_start = new boolean[128];
     private static final boolean[] symbols_var_name = new boolean[128];
     private static final boolean[] symbols_assign = new boolean[128];
+    private static final boolean[] symbols_end = new boolean[128];
 
     private static final Map<String, Operator> token2Operator = new LinkedHashMap<>();
 
@@ -119,11 +123,12 @@ public class Evaluate {
             symbols_var_name[i] = symbols_number[i] || symbols_var_start[i];
             // 赋值
             symbols_assign[i] = i == '=';
+            symbols_end[i] = i == ';';
             // 所有有效字符
             symbols_all[i] = symbols_number[i] || symbols_float[i]
                     || symbols_letter[i] || symbols_operator[i] || symbols_bracket[i]
                     || symbols_var_start[i] || symbols_var_name[i]
-                    || symbols_assign[i];
+                    || symbols_assign[i] || symbols_end[i];
 
             Arrays.asList(
                     new Operator("+", 2, 1, 1),
@@ -170,6 +175,8 @@ public class Evaluate {
         Expr expr = new Expr(NodeType.EXPR, "()", exprText);
         handleBracket(expr, nodes);
         log.info("处理括号完成:{}", toExprText(expr));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
+        log.info("处理赋值=完成:{}", toExprText(expr));
         handleSerialOperator(expr);
         log.info("处理孤立的正负号完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("^")));
@@ -178,8 +185,6 @@ public class Evaluate {
         log.info("处理操作符*、/完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("+", "-")));
         log.info("处理操作符+、-完成:{}", toExprText(expr));
-        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
-        log.info("处理赋值=完成:{}", toExprText(expr));
         return expr;
     }
 
@@ -352,18 +357,18 @@ public class Evaluate {
                 if (operator == null) {
                     throw new IllegalArgumentException("token不合法:" + node);
                 }
-                List<Node> argNodes = new LinkedList<>();
+                LinkedList<Node> argNodes = new LinkedList<>();
                 for (int i = operator.getLeftArgNum() - 1; i >= 0; i--) {
                     if (children.isEmpty()) {
-                        throw new IllegalArgumentException(node.getType().getName() + "左侧参数缺失:" + node);
+                        throw new IllegalArgumentException(node.getType().getName() + (isStartLeft ? "左" : "右") + "侧参数缺失:" + node);
                     }
-                    argNodes.add(0, children.removeLast()); // 从左往右遍历,右侧参数已处理过
+                    argNodes.add(isStartLeft ? 0 : argNodes.size(), children.removeLast()); // 从左往右遍历,右侧参数已处理过
                 }
                 for (int i = 0; i < operator.getRightArgNum(); i++) {
                     if (!iterator.hasNext()) {
-                        throw new IllegalArgumentException(node.getType().getName() + "右侧参数缺失:" + node);
+                        throw new IllegalArgumentException(node.getType().getName() + (isStartLeft ? "右" : "左") + "侧参数缺失:" + node);
                     }
-                    argNodes.add(handleOperator(iterator.next(), isStartLeft, operatorTokens));
+                    argNodes.add(isStartLeft ? argNodes.size() : 0, handleOperator(iterator.next(), isStartLeft, operatorTokens));
                 }
                 node.setChildren(argNodes);
                 children.add(node);
@@ -469,6 +474,9 @@ public class Evaluate {
                 i = j;
             } else if (symbols_assign[ch]) {
                 nodes.add(new Node(NodeType.ASSIGN, ch + "", i, i + 1));
+                i++;
+            } else if (symbols_end[ch]) {
+                nodes.add(new Node(NodeType.END, ch + "", i, i + 1));
                 i++;
             } else {
                 i++;
