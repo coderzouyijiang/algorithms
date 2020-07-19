@@ -175,7 +175,7 @@ public class Evaluate {
         Expr expr = new Expr(NodeType.EXPR, "()", exprText);
         handleBracket(expr, nodes);
         log.info("处理括号完成:{}", toExprText(expr));
-        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
+        handleOperator(expr, false, new HashSet<>(Arrays.asList("=")));
         log.info("处理赋值=完成:{}", toExprText(expr));
         handleSerialOperator(expr);
         log.info("处理孤立的正负号完成:{}", toExprText(expr));

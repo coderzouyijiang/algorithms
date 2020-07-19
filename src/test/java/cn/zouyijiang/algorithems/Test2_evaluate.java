@@ -60,15 +60,33 @@ public class Test2_evaluate {
         int a = 9;
         evaluate.putVar("a", new BigDecimal(9));
         int x = 1 + 1, y = 2 + a;
-        log.info("result={},{};{}", x, y, evaluate.evaluate("x=1+1,y=2+a"));
+        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("x=(1+1),y=(2+a)"));
         log.info("vars={}", evaluate.getVars());
         int i = 1 + 2, j = i * 3, k = (j - 1) * 2;
-        log.info("result={},{},{};{}", i, j, k, evaluate.evaluate("i=1+2,j=i*3,k=(j-1)*2"));
+        log.info("result:i={},j={},k={};{}", i, j, k, evaluate.evaluate("i=(1+2),j=(i*3),k=((j-1)*2)"));
         log.info("vars={}", evaluate.getVars());
         int s, q = (1 + 5 * (s = (1 + x)));
-        log.info("result={},{};{}", q, s, evaluate.evaluate("q=(1+5*s=(1+x))"));
+        log.info("result:q={},s={};{}", q, s, evaluate.evaluate("q=(1+5*s=(1+x))"));
         log.info("vars={}", evaluate.getVars());
+    }
 
+    @Test
+    public void test_assign2() {
+        Evaluate evaluate = new Evaluate();
+        int a = 9;
+        evaluate.putVar("a", new BigDecimal(9));
+        int x = 1 + 1, y = 2 + a;
+        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("x=1+1;y=2+a"));
+    }
+
+    @Test
+    public void test_assign3() {
+        Evaluate evaluate = new Evaluate();
+        int a = 9;
+        evaluate.putVar("a", new BigDecimal(9));
+        int x, y = (x = a + 1);
+        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("y=(x=(a+1))"));
+        log.info("vars={}", evaluate.getVars());
     }
 
 }
