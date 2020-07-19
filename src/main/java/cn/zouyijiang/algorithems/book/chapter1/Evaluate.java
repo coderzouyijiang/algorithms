@@ -9,11 +9,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -90,7 +92,7 @@ public class Evaluate {
             // 字母
             symbols_letter[i] = (i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z');
             // 操作符
-            symbols_operator[i] = i == '+' || i == '-' || i == '*' || i == '/';
+            symbols_operator[i] = i == '+' || i == '-' || i == '*' || i == '/' || i == '^';
             // 括号
             symbols_bracket[i] = i == '(' || i == ')';
             // 变量前缀
@@ -115,10 +117,16 @@ public class Evaluate {
         this.roundingMode = roundingMode;
         this.token2Operator = new LinkedHashMap<>();
         Arrays.asList(
-                new Operator("+", 2, 1, 1, list -> list.get(0).add(list.get(1))),
-                new Operator("-", 2, 1, 1, list -> list.get(0).subtract(list.get(1))),
-                new Operator("*", 1, 1, 1, list -> list.get(0).multiply(list.get(1))),
-                new Operator("/", 1, 1, 1, list -> list.get(0).divide(list.get(1), this.scale, roundingMode))
+                new Operator("+", 2, 1, 1
+                        , list -> list.get(0).add(list.get(1))),
+                new Operator("-", 2, 1, 1
+                        , list -> list.get(0).subtract(list.get(1))),
+                new Operator("*", 1, 1, 1
+                        , list -> list.get(0).multiply(list.get(1))),
+                new Operator("/", 1, 1, 1
+                        , list -> list.get(0).divide(list.get(1), this.scale, roundingMode)),
+                new Operator("^", 0, 1, 1
+                        , list -> list.get(0).pow(list.get(1).intValue()))
         ).forEach(it -> token2Operator.put(it.getToken(), it));
 
         varMap = new LinkedHashMap<>();
@@ -138,6 +146,7 @@ public class Evaluate {
         // 处理括号,返回一个双向链表
         Expr expr = new Expr(NodeType.EXPR, "()", exprText);
         handleBracket(expr, nodes);
+        handleOperator(expr, new HashSet<>(Arrays.asList("^")));
         handleOperator(expr, new HashSet<>(Arrays.asList("*", "/")));
         handleOperator(expr, new HashSet<>(Arrays.asList("+", "-")));
         log.info("解析表达式完成:{}", printNodes(expr, exprText));
@@ -216,18 +225,28 @@ public class Evaluate {
         }
 //        log.info("handleOperator:parent={},children={}", parentNode, parentNode.getChildren());
         LinkedList<Node> children = new LinkedList<>();
-        Iterator<Node> iterator = parentNode.getChildren().iterator();
+        ListIterator<Node> iterator = parentNode.getChildren().listIterator(0);
         while (iterator.hasNext()) {
             Node node = iterator.next();
             if (operatorTokens.contains(node.getToken())) {
-                if (children.isEmpty()) {
-                    throw new IllegalArgumentException("操作符左侧参数缺失:" + node);
+                Operator operator = token2Operator.get(node.getToken());
+                if (operator == null) {
+                    throw new IllegalArgumentException("操作符不合法:" + node);
                 }
-                Node last = children.pop(); // 左侧参数已处理过
-                if (!iterator.hasNext()) {
-                    throw new IllegalArgumentException("操作符右侧参数缺失:" + node);
+                List<Node> argNodes = new LinkedList<>();
+                for (int i = operator.getLeftArgNum() - 1; i >= 0; i--) {
+                    if (children.isEmpty()) {
+                        throw new IllegalArgumentException("操作符左侧参数缺失:" + node);
+                    }
+                    argNodes.add(0, children.pop()); // 从左往右遍历,右侧参数已处理过
                 }
-                node.setChildren(Arrays.asList(last, handleOperator(iterator.next(), operatorTokens)));
+                for (int i = 0; i < operator.getRightArgNum(); i++) {
+                    if (!iterator.hasNext()) {
+                        throw new IllegalArgumentException("操作符右侧参数缺失:" + node);
+                    }
+                    argNodes.add(handleOperator(iterator.next(), operatorTokens));
+                }
+                node.setChildren(argNodes);
                 children.add(node);
             } else {
                 node = handleOperator(node, operatorTokens);
