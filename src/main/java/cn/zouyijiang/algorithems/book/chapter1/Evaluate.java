@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -72,7 +71,6 @@ public class Evaluate {
         private int level;
         private int leftArgNum;
         private int rightArgNum;
-        private Function<List<BigDecimal>, BigDecimal> func;
     }
 
     private static final boolean[] symbols_all = new boolean[128];
@@ -83,6 +81,10 @@ public class Evaluate {
     private static final boolean[] symbols_bracket = new boolean[128];
     private static final boolean[] symbols_var_start = new boolean[128];
     private static final boolean[] symbols_var_name = new boolean[128];
+
+    private static final Map<String, Operator> token2Operator = new LinkedHashMap<>();
+
+    private static final Set<String> specialTokens = new HashSet<>(Arrays.asList("+", "-"));
 
     static {
         for (int i = 0; i < symbols_all.length; i++) {
@@ -103,31 +105,32 @@ public class Evaluate {
             symbols_all[i] = symbols_number[i] || symbols_float[i]
                     || symbols_letter[i] || symbols_operator[i] || symbols_bracket[i]
                     || symbols_var_start[i] || symbols_var_name[i];
+
+            Arrays.asList(
+                    new Operator("+", 2, 1, 1),
+                    new Operator("-", 2, 1, 1),
+                    new Operator("*", 1, 1, 1),
+                    new Operator("/", 1, 1, 1),
+                    new Operator("^", 0, 1, 1)
+            ).forEach(it -> token2Operator.put(it.getToken(), it));
         }
     }
 
     private final int scale;
     private final RoundingMode roundingMode;
-    private final Map<String, Operator> token2Operator;
-
+    private final Map<String, Function<List<BigDecimal>, BigDecimal>> token2Func;
     private final Map<String, BigDecimal> varMap;
 
     public Evaluate(int scale, RoundingMode roundingMode) {
         this.scale = scale;
         this.roundingMode = roundingMode;
-        this.token2Operator = new LinkedHashMap<>();
-        Arrays.asList(
-                new Operator("+", 2, 1, 1
-                        , list -> list.get(0).add(list.get(1))),
-                new Operator("-", 2, 1, 1
-                        , list -> list.get(0).subtract(list.get(1))),
-                new Operator("*", 1, 1, 1
-                        , list -> list.get(0).multiply(list.get(1))),
-                new Operator("/", 1, 1, 1
-                        , list -> list.get(0).divide(list.get(1), this.scale, roundingMode)),
-                new Operator("^", 0, 1, 1
-                        , list -> list.get(0).pow(list.get(1).intValue()))
-        ).forEach(it -> token2Operator.put(it.getToken(), it));
+
+        token2Func = new LinkedHashMap<>();
+        token2Func.put("+", list -> list.get(0).add(list.get(1)));
+        token2Func.put("-", list -> list.get(0).subtract(list.get(1)));
+        token2Func.put("*", list -> list.get(0).multiply(list.get(1)));
+        token2Func.put("/", list -> list.get(0).divide(list.get(1), scale, roundingMode));
+        token2Func.put("^", list -> BigDecimal.valueOf(Math.pow(list.get(0).doubleValue(), list.get(1).doubleValue())));
 
         varMap = new LinkedHashMap<>();
         varMap.put("e", new BigDecimal(Math.E));
@@ -142,15 +145,59 @@ public class Evaluate {
     public Expr parseExpr(String exprText) {
         log.info("解析表达式开始:{}", exprText);
         List<Node> nodes = expr2Nodes(exprText);
-        log.info("解析token完成:{}", nodes);
+        log.info("解析token完成:{}", nodesToStr(nodes));
         // 处理括号,返回一个双向链表
         Expr expr = new Expr(NodeType.EXPR, "()", exprText);
         handleBracket(expr, nodes);
+        log.info("处理括号完成:{}", toExprText(expr));
+        handleSerialOperator(expr);
+        log.info("处理孤立的正负号完成:{}", toExprText(expr));
         handleOperator(expr, new HashSet<>(Arrays.asList("^")));
+        log.info("处理操作符^完成:{}", toExprText(expr));
         handleOperator(expr, new HashSet<>(Arrays.asList("*", "/")));
+        log.info("处理操作符*、/完成:{}", toExprText(expr));
         handleOperator(expr, new HashSet<>(Arrays.asList("+", "-")));
-        log.info("解析表达式完成:{}", printNodes(expr, exprText));
+        log.info("处理操作符+、-完成:{}", toExprText(expr));
         return expr;
+    }
+
+    // 处理连续的符号
+    private void handleSerialOperator(Node headNode) {
+        if (headNode.getChildren() == null) return;
+        LinkedList<Node> children = new LinkedList<>();
+//        Node preNode = new Node(NodeType.OPERATOR, "+", headNode.getRowBegin(), headNode.getRowBegin());
+        Iterator<Node> iterator = headNode.getChildren().iterator();
+        Node preNode = iterator.next();
+        if (preNode.getType() == NodeType.OPERATOR) {
+            if (specialTokens.contains(preNode.getToken())) {
+                Node zeroNode = new Node(NodeType.NUMBER, "0", preNode.getRowBegin(), preNode.getRowBegin());
+                children.add(zeroNode);
+            } else {
+                throw new IllegalArgumentException("操作符缺少左侧参数:" + preNode);
+            }
+        }
+        children.add(preNode);
+        while (iterator.hasNext()) {
+            Node node = iterator.next();
+            if (preNode.getType() == NodeType.OPERATOR && node.getType() == NodeType.OPERATOR) {
+                if (specialTokens.contains(node.getToken()) && iterator.hasNext()) {
+                    Node next = iterator.next();
+                    if (next.getType() != NodeType.OPERATOR) {
+                        Node zeroNode = new Node(NodeType.NUMBER, "0", node.getRowBegin(), node.getRowBegin());
+                        Node exprNode = new Node(NodeType.EXPR, "()", node.getRowBegin(), node.getRowBegin());
+                        exprNode.setChildren(Arrays.asList(zeroNode, node, next));
+                        children.add(exprNode);
+                        preNode = exprNode;
+                        continue;
+                    }
+                }
+                throw new IllegalArgumentException("操作符缺少左侧参数:" + node);
+            }
+            handleSerialOperator(node);
+            children.add(node);
+            preNode = node;
+        }
+        headNode.setChildren(children);
     }
 
     public BigDecimal evaluate(String exprText) {
@@ -168,7 +215,7 @@ public class Evaluate {
             if (args.size() < operator.getLeftArgNum() + operator.getRightArgNum()) {
                 throw new IllegalArgumentException("计算参数不足:" + headNode);
             }
-            BigDecimal result = operator.getFunc().apply(args);
+            BigDecimal result = token2Func.get(headNode.getToken()).apply(args);
             return result;
         } else if (headNode.getType() == NodeType.VAR) {
             BigDecimal val = varMap.get(headNode.getToken());
@@ -218,6 +265,32 @@ public class Evaluate {
         return String.join("\n", lines);
     }
 
+    public static String toExprText(Node headNode) {
+        if (headNode.getChildren() == null || headNode.getChildren().isEmpty()) {
+            return headNode.getToken();
+        } else if (headNode.getType() == NodeType.OPERATOR) {
+            Operator operator = token2Operator.get(headNode.getToken());
+            Iterator<Node> iterator = headNode.getChildren().iterator();
+            List<Node> lefts = new LinkedList<>(), rights = new LinkedList<>();
+            for (int i = 0; i < operator.getLeftArgNum(); i++) lefts.add(iterator.next());
+            for (int i = 0; i < operator.getRightArgNum(); i++) rights.add(iterator.next());
+            return "(" + nodesToStr(lefts) + headNode.getToken() + nodesToStr(rights) + ")";
+        } else if (headNode.getType() == NodeType.NUMBER || headNode.getType() == NodeType.VAR) {
+            return headNode.getToken();
+        } else {
+            return nodesToStr(headNode.getChildren());
+        }
+    }
+
+    private static String nodesToStr(List<Node> nodes) {
+        if (nodes == null || nodes.isEmpty()) return "";
+        if (nodes.size() == 1) {
+            return Evaluate.toExprText(nodes.get(0));
+        } else {
+            return nodes.stream().map(Evaluate::toExprText).collect(Collectors.joining(",", "(", ")"));
+        }
+    }
+
     private Node handleOperator(Node parentNode, Set<String> operatorTokens) {
         if (parentNode.getChildren() == null || parentNode.getChildren().isEmpty()) return parentNode;
         if (parentNode.getChildren().size() == 1) {
@@ -238,7 +311,7 @@ public class Evaluate {
                     if (children.isEmpty()) {
                         throw new IllegalArgumentException("操作符左侧参数缺失:" + node);
                     }
-                    argNodes.add(0, children.pop()); // 从左往右遍历,右侧参数已处理过
+                    argNodes.add(0, children.removeLast()); // 从左往右遍历,右侧参数已处理过
                 }
                 for (int i = 0; i < operator.getRightArgNum(); i++) {
                     if (!iterator.hasNext()) {
@@ -253,7 +326,7 @@ public class Evaluate {
                 children.add(node);
             }
         }
-        log.info("handleOperator:parent={},children2={}", parentNode, children);
+//        log.info("handleOperator:parent={},children2={}", parentNode, children);
         parentNode.setChildren(children);
         while (parentNode.getChildren() != null && parentNode.getChildren().size() == 1) {
             parentNode = parentNode.getChildren().get(0);

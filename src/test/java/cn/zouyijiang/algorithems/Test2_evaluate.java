@@ -38,8 +38,19 @@ public class Test2_evaluate {
     public void test_negate() {
         Evaluate evaluate = new Evaluate();
         evaluate.putVar("a", new BigDecimal("1"));
-        log.info("result:{},{}", 2 + -11, evaluate.evaluate("2+-11"));
-//        log.info("result:{},{}", 2 + -11, evaluate.evaluate("2+(-11)"));
+//        log.info("result:{},{}", 2 + -11, evaluate.evaluate("2+-11"));
+        log.info("result:{},{}", 2 + (-11), evaluate.evaluate("2+(-11)"));
+        log.info("result:{},{}", 2 * -11 - -9, evaluate.evaluate("2*-11--9"));
+        log.info("result:{},{}", 2 * -1 - -9, evaluate.evaluate("2*-a--9"));
+    }
+
+    @Test
+    public void test_pow() {
+        Evaluate evaluate = new Evaluate();
+        evaluate.putVar("a", new BigDecimal("2"));
+        log.info("result:{},{}", -Math.pow(11, 2), evaluate.evaluate("-11^a"));
+        log.info("result:{},{}", -Math.pow(11, 1.1), evaluate.evaluate("-11^1.1"));
+        log.info("result:{},{}", 5 * Math.pow(-11, 2), evaluate.evaluate("5*-11^a"));
     }
 
 }
