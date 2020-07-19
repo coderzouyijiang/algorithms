@@ -65,8 +65,7 @@ public class Test2_evaluate {
         int i = 1 + 2, j = i * 3, k = (j - 1) * 2;
         log.info("result={},{},{};{}", i, j, k, evaluate.evaluate("i=1+2,j=i*3,k=(j-1)*2"));
         log.info("vars={}", evaluate.getVars());
-        int s;
-        int q = (1 + 5 * (s = (1 + x)));
+        int s, q = (1 + 5 * (s = (1 + x)));
         log.info("result={},{};{}", q, s, evaluate.evaluate("q=(1+5*s=(1+x))"));
         log.info("vars={}", evaluate.getVars());
 

@@ -2,6 +2,7 @@ package cn.zouyijiang.algorithems.book.chapter1;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
@@ -11,6 +12,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -18,17 +20,27 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
 public class Evaluate {
 
+    @Getter
+    @AllArgsConstructor
     public enum NodeType {
-        NUMBER, OPERATOR, BRACKET,
-        EXPR, VAR
+        NUMBER("数字"),
+        OPERATOR("操作符"),
+        BRACKET("括号"),
+        EXPR("表达式"),
+        VAR("变量"),
+        ASSIGN("赋值"); // 右结合
+
+        private final String name;
     }
 
     @AllArgsConstructor
@@ -40,8 +52,8 @@ public class Evaluate {
         private int rowBegin;
         private int rowEnd;
         private List<Node> children;
-        private Node left;
-        private Node right;
+//        private Node left;
+//        private Node right;
 
         @Override
         public String toString() {
@@ -84,6 +96,7 @@ public class Evaluate {
     private static final boolean[] symbols_bracket = new boolean[128];
     private static final boolean[] symbols_var_start = new boolean[128];
     private static final boolean[] symbols_var_name = new boolean[128];
+    private static final boolean[] symbols_assign = new boolean[128];
 
     private static final Map<String, Operator> token2Operator = new LinkedHashMap<>();
 
@@ -104,17 +117,21 @@ public class Evaluate {
             symbols_var_start[i] = symbols_letter[i] || i == '_' || i == '$';
             // 变量名称
             symbols_var_name[i] = symbols_number[i] || symbols_var_start[i];
+            // 赋值
+            symbols_assign[i] = i == '=';
             // 所有有效字符
             symbols_all[i] = symbols_number[i] || symbols_float[i]
                     || symbols_letter[i] || symbols_operator[i] || symbols_bracket[i]
-                    || symbols_var_start[i] || symbols_var_name[i];
+                    || symbols_var_start[i] || symbols_var_name[i]
+                    || symbols_assign[i];
 
             Arrays.asList(
                     new Operator("+", 2, 1, 1),
                     new Operator("-", 2, 1, 1),
                     new Operator("*", 1, 1, 1),
                     new Operator("/", 1, 1, 1),
-                    new Operator("^", 0, 1, 1)
+                    new Operator("^", 0, 1, 1),
+                    new Operator("=", 0, 1, 1)
             ).forEach(it -> token2Operator.put(it.getToken(), it));
         }
     }
@@ -155,12 +172,14 @@ public class Evaluate {
         log.info("处理括号完成:{}", toExprText(expr));
         handleSerialOperator(expr);
         log.info("处理孤立的正负号完成:{}", toExprText(expr));
-        handleOperator(expr, new HashSet<>(Arrays.asList("^")));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("^")));
         log.info("处理操作符^完成:{}", toExprText(expr));
-        handleOperator(expr, new HashSet<>(Arrays.asList("*", "/")));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("*", "/")));
         log.info("处理操作符*、/完成:{}", toExprText(expr));
-        handleOperator(expr, new HashSet<>(Arrays.asList("+", "-")));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("+", "-")));
         log.info("处理操作符+、-完成:{}", toExprText(expr));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
+        log.info("处理赋值=完成:{}", toExprText(expr));
         return expr;
     }
 
@@ -176,7 +195,7 @@ public class Evaluate {
                 Node zeroNode = new Node(NodeType.NUMBER, "0", preNode.getRowBegin(), preNode.getRowBegin());
                 children.add(zeroNode);
             } else {
-                throw new IllegalArgumentException("操作符缺少左侧参数:" + preNode);
+                throw new IllegalArgumentException(preNode.getType().getName() + "缺少左侧参数:" + preNode);
             }
         }
         children.add(preNode);
@@ -194,7 +213,7 @@ public class Evaluate {
                         continue;
                     }
                 }
-                throw new IllegalArgumentException("操作符缺少左侧参数:" + node);
+                throw new IllegalArgumentException(node.getType().getName() + "缺少左侧参数:" + node);
             }
             handleSerialOperator(node);
             children.add(node);
@@ -205,6 +224,7 @@ public class Evaluate {
 
     public BigDecimal evaluate(String exprText) {
         Expr expr = parseExpr(exprText);
+        log.info("计算开始:{}", toExprText(expr, varMap));
         BigDecimal result = calculate(expr);
         log.info("计算完成:{}={}", result, toExprText(expr, varMap));
         return result;
@@ -228,8 +248,18 @@ public class Evaluate {
             }
             return val;
         } else if (headNode.getType() == NodeType.EXPR) {
-            BigDecimal result = calculate(headNode.getChildren().get(0));
-            putTempVar(result);
+            BigDecimal result = null;
+            for (Node node : headNode.getChildren()) {
+                result = calculate(node);
+                if (node.getType() != NodeType.ASSIGN) {
+                    putTempVar(result);
+                }
+            }
+            return result;
+        } else if (headNode.getType() == NodeType.ASSIGN) {
+            String valName = headNode.getChildren().get(0).getToken();
+            BigDecimal result = calculate(headNode.getChildren().get(1));
+            putVar(valName, result);
             return result;
         } else {
             throw new IllegalArgumentException("无效的token:" + headNode);
@@ -274,7 +304,7 @@ public class Evaluate {
     }
 
     public static String toExprText(Node headNode, Map<String, BigDecimal> varMap) {
-        if (headNode.getType() == NodeType.OPERATOR) {
+        if (headNode.getType() == NodeType.OPERATOR || headNode.getType() == NodeType.ASSIGN) {
             if (headNode.getChildren() == null || headNode.getChildren().isEmpty()) {
                 return headNode.getToken();
             }
@@ -307,38 +337,38 @@ public class Evaluate {
         }
     }
 
-    private Node handleOperator(Node parentNode, Set<String> operatorTokens) {
+    private Node handleOperator(Node parentNode, boolean isStartLeft, Set<String> operatorTokens) {
         if (parentNode.getChildren() == null || parentNode.getChildren().isEmpty()) return parentNode;
         if (parentNode.getChildren().size() == 1) {
-            return handleOperator(parentNode.getChildren().get(0), operatorTokens);
+            return handleOperator(parentNode.getChildren().get(0), isStartLeft, operatorTokens);
         }
 //        log.info("handleOperator:parent={},children={}", parentNode, parentNode.getChildren());
         LinkedList<Node> children = new LinkedList<>();
-        ListIterator<Node> iterator = parentNode.getChildren().listIterator(0);
+        Iterator<Node> iterator = getIterator(parentNode.getChildren(), isStartLeft);
         while (iterator.hasNext()) {
             Node node = iterator.next();
             if (operatorTokens.contains(node.getToken())) {
                 Operator operator = token2Operator.get(node.getToken());
                 if (operator == null) {
-                    throw new IllegalArgumentException("操作符不合法:" + node);
+                    throw new IllegalArgumentException("token不合法:" + node);
                 }
                 List<Node> argNodes = new LinkedList<>();
                 for (int i = operator.getLeftArgNum() - 1; i >= 0; i--) {
                     if (children.isEmpty()) {
-                        throw new IllegalArgumentException("操作符左侧参数缺失:" + node);
+                        throw new IllegalArgumentException(node.getType().getName() + "左侧参数缺失:" + node);
                     }
                     argNodes.add(0, children.removeLast()); // 从左往右遍历,右侧参数已处理过
                 }
                 for (int i = 0; i < operator.getRightArgNum(); i++) {
                     if (!iterator.hasNext()) {
-                        throw new IllegalArgumentException("操作符右侧参数缺失:" + node);
+                        throw new IllegalArgumentException(node.getType().getName() + "右侧参数缺失:" + node);
                     }
-                    argNodes.add(handleOperator(iterator.next(), operatorTokens));
+                    argNodes.add(handleOperator(iterator.next(), isStartLeft, operatorTokens));
                 }
                 node.setChildren(argNodes);
                 children.add(node);
             } else {
-                node = handleOperator(node, operatorTokens);
+                node = handleOperator(node, isStartLeft, operatorTokens);
                 children.add(node);
             }
         }
@@ -350,23 +380,57 @@ public class Evaluate {
         return parentNode;
     }
 
+    private static <T> Iterator<T> getIterator(List<T> list, boolean isStartLeft) {
+        if (isStartLeft) {
+            return list.iterator();
+        }
+        ListIterator<T> iterator = list.listIterator(list.size());
+        return new Iterator<T>() {
+            @Override
+            public boolean hasNext() {
+                return iterator.hasPrevious();
+            }
+
+            @Override
+            public T next() {
+                return iterator.previous();
+            }
+
+            @Override
+            public void remove() {
+                iterator.remove();
+            }
+
+            @Override
+            public void forEachRemaining(Consumer<? super T> action) {
+                iterator.forEachRemaining(action);
+            }
+        };
+    }
+
     private void handleBracket(Node headNode, List<Node> nodes) {
         headNode.setChildren(new LinkedList<>());
         Node leftNode = headNode;
+//        Map<Integer, Node> leftMap = new LinkedHashMap<>();
+//        Map<Integer, Node> rightMap = new LinkedHashMap<>();
+        Deque<Node> deque = new LinkedList<>();
+        deque.push(leftNode);
         for (Node node : nodes) {
             if (node.getType() == NodeType.BRACKET) {
                 if (leftNode.getToken().equals("(") && node.getToken().equals(")")) {
-                    Node preLeft = leftNode.getLeft();
+//                    Node preLeft = leftNode.getLeft();
+                    Node preLeft = deque.pop();
                     preLeft.getChildren().add(leftNode);
-                    preLeft.setRight(null);
-                    leftNode.setLeft(null);
+//                    preLeft.setRight(null);
+//                    leftNode.setLeft(null);
                     leftNode.setToken("()");
                     leftNode.setType(NodeType.EXPR);
                     leftNode.setRowEnd(node.getRowEnd());
                     leftNode = preLeft;
                 } else {
-                    leftNode.setRight(node);
-                    node.setLeft(leftNode);
+//                    leftNode.setRight(node);
+//                    node.setLeft(leftNode);
+                    deque.push(leftNode);
                     node.setChildren(new LinkedList<>());
                     leftNode = node;
                 }
@@ -403,6 +467,9 @@ public class Evaluate {
                 String varName = expr.substring(i, j);
                 nodes.add(new Node(NodeType.VAR, varName, i, j));
                 i = j;
+            } else if (symbols_assign[ch]) {
+                nodes.add(new Node(NodeType.ASSIGN, ch + "", i, i + 1));
+                i++;
             } else {
                 i++;
             }
