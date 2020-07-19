@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -25,7 +24,7 @@ public class Evaluate {
 
     public enum NodeType {
         NUMBER, OPERATOR, BRACKET,
-        EXPR
+        EXPR, VAR
     }
 
     @AllArgsConstructor
@@ -76,49 +75,61 @@ public class Evaluate {
 
     private static final boolean[] symbols_all = new boolean[128];
     private static final boolean[] symbols_number = new boolean[128];
+    private static final boolean[] symbols_float = new boolean[128];
     private static final boolean[] symbols_letter = new boolean[128];
     private static final boolean[] symbols_operator = new boolean[128];
     private static final boolean[] symbols_bracket = new boolean[128];
+    private static final boolean[] symbols_var_start = new boolean[128];
+    private static final boolean[] symbols_var_name = new boolean[128];
 
     static {
         for (int i = 0; i < symbols_all.length; i++) {
             // 数字
-            symbols_number[i] = (i >= '0' && i <= '9') || i == '.';
+            symbols_number[i] = i >= '0' && i <= '9';
+            symbols_float[i] = symbols_number[i] || i == '.';
             // 字母
-            symbols_letter[i] = (i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || i == '_';
+            symbols_letter[i] = (i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z');
             // 操作符
             symbols_operator[i] = i == '+' || i == '-' || i == '*' || i == '/';
             // 括号
             symbols_bracket[i] = i == '(' || i == ')';
+            // 变量前缀
+            symbols_var_start[i] = symbols_letter[i] || i == '_' || i == '$';
+            // 变量名称
+            symbols_var_name[i] = symbols_number[i] || symbols_var_start[i];
             // 所有有效字符
-            symbols_all[i] = symbols_number[i] || symbols_letter[i] || symbols_operator[i] || symbols_bracket[i];
+            symbols_all[i] = symbols_number[i] || symbols_float[i]
+                    || symbols_letter[i] || symbols_operator[i] || symbols_bracket[i]
+                    || symbols_var_start[i] || symbols_var_name[i];
         }
     }
 
-    private final int divideScale;
-    private final RoundingMode divideRoundingModel;
+    private final int scale;
+    private final RoundingMode roundingMode;
     private final Map<String, Operator> token2Operator;
 
-    public Evaluate(int divideScale, RoundingMode divideRoundingModel) {
-        this.divideScale = divideScale;
-        this.divideRoundingModel = divideRoundingModel;
+    private final Map<String, BigDecimal> varMap;
+
+    public Evaluate(int scale, RoundingMode roundingMode) {
+        this.scale = scale;
+        this.roundingMode = roundingMode;
         this.token2Operator = new LinkedHashMap<>();
         Arrays.asList(
                 new Operator("+", 2, 1, 1, list -> list.get(0).add(list.get(1))),
                 new Operator("-", 2, 1, 1, list -> list.get(0).subtract(list.get(1))),
                 new Operator("*", 1, 1, 1, list -> list.get(0).multiply(list.get(1))),
-                new Operator("/", 1, 1, 1, list -> list.get(0).divide(list.get(1), divideScale, divideRoundingModel))
+                new Operator("/", 1, 1, 1, list -> list.get(0).divide(list.get(1), this.scale, roundingMode))
         ).forEach(it -> token2Operator.put(it.getToken(), it));
+
+        varMap = new LinkedHashMap<>();
+        varMap.put("e", new BigDecimal(Math.E));
+        varMap.put("pi", new BigDecimal(Math.PI));
     }
 
     public Evaluate() {
-        this(8, RoundingMode.HALF_UP);
+        this(48, RoundingMode.HALF_UP);
     }
 
-    // 参数队列
-    private Deque<String> argmentDeque = new LinkedList<>();
-    // 操作符队列
-    private Deque<String> operatorDeque = new LinkedList<>();
 
     public Expr parseExpr(String exprText) {
         log.info("解析表达式开始:{}", exprText);
@@ -139,7 +150,7 @@ public class Evaluate {
         return result;
     }
 
-    private BigDecimal calculate(Node headNode) {
+    public BigDecimal calculate(Node headNode) {
         if (headNode.getType() == NodeType.NUMBER) {
             return new BigDecimal(headNode.token);
         } else if (headNode.getType() == NodeType.OPERATOR) {
@@ -150,11 +161,37 @@ public class Evaluate {
             }
             BigDecimal result = operator.getFunc().apply(args);
             return result;
+        } else if (headNode.getType() == NodeType.VAR) {
+            BigDecimal val = varMap.get(headNode.getToken());
+            if (val == null) {
+                throw new IllegalArgumentException("找不到变量:" + headNode);
+            }
+            return val;
         } else if (headNode.getType() == NodeType.EXPR) {
-            return calculate(headNode.getChildren().get(0));
+            BigDecimal result = calculate(headNode.getChildren().get(0));
+            putTempVar(result);
+            return result;
         } else {
             throw new IllegalArgumentException("无效的token:" + headNode);
         }
+    }
+
+    private void putTempVar(BigDecimal val) {
+        Integer maxKey = varMap.keySet().stream().filter(it -> it.matches("\\$[0-9]+"))
+                .map(it -> Integer.valueOf(it.substring(1))).max(Integer::compareTo).orElse(0);
+        varMap.put("$" + (maxKey + 1), val);
+    }
+
+    public void putVar(String name, BigDecimal val) {
+        varMap.put(name, val);
+    }
+
+    public BigDecimal getVar(String name) {
+        return varMap.get(name);
+    }
+
+    public Map<String, BigDecimal> getVars() {
+        return new LinkedHashMap<>(varMap);
     }
 
     private static void printNodes(Node head, String prefix, List<String> lines) {
@@ -236,14 +273,13 @@ public class Evaluate {
 
     private List<Node> expr2Nodes(String expr) {
         List<Node> nodes = new ArrayList<>();
-        Node left = null;
         for (int i = 0; i < expr.length(); ) {
             char ch = expr.charAt(i);
             if (!symbols_all[ch]) {
                 i++;
             } else if (symbols_number[ch]) {
                 int j = i + 1;
-                while (j < expr.length() && symbols_number[expr.charAt(j)]) j++;
+                while (j < expr.length() && symbols_float[expr.charAt(j)]) j++;
                 String number = expr.substring(i, j);
                 nodes.add(new Node(NodeType.NUMBER, number, i, j));
                 i = j;
@@ -253,6 +289,12 @@ public class Evaluate {
             } else if (symbols_bracket[ch]) {
                 nodes.add(new Node(NodeType.BRACKET, ch + "", i, i + 1));
                 i++;
+            } else if (symbols_var_start[ch]) {
+                int j = i + 1;
+                while (j < expr.length() && symbols_var_name[expr.charAt(j)]) j++;
+                String varName = expr.substring(i, j);
+                nodes.add(new Node(NodeType.VAR, varName, i, j));
+                i = j;
             } else {
                 i++;
             }
