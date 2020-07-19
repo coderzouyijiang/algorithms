@@ -76,7 +76,9 @@ public class Test2_evaluate {
         int a = 9;
         evaluate.putVar("a", new BigDecimal(9));
         int x = 1 + 1, y = 2 + a;
-        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("x=1+1;y=2+a"));
+//        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("x=1+1,y=-2+a,z=-3+a-k2=3-1"));
+        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("x=1+1,y=-2+a,z=-3+a-(k2=3-1)"));
+        log.info("vars={}", evaluate.getVars());
     }
 
     @Test

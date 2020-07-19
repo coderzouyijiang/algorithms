@@ -54,7 +54,7 @@ public class Evaluate {
         private int rowEnd;
         private List<Node> children;
 
-        private List<String> assignVars;
+        private List<String> varNames;
 //        private Node left;
 //        private Node right;
 
@@ -175,17 +175,42 @@ public class Evaluate {
         Expr expr = new Expr(NodeType.EXPR, "()", exprText);
         handleBracket(expr, nodes);
         log.info("处理括号完成:{}", toExprText(expr));
-        handleOperator(expr, false, new HashSet<>(Arrays.asList("=")));
-        log.info("处理赋值=完成:{}", toExprText(expr));
         handleSerialOperator(expr);
         log.info("处理孤立的正负号完成:{}", toExprText(expr));
+//        handleAssign(expr);
+//        log.info("处理赋值=完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("^")));
         log.info("处理操作符^完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("*", "/")));
         log.info("处理操作符*、/完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("+", "-")));
         log.info("处理操作符+、-完成:{}", toExprText(expr));
+        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
+        log.info("处理赋值=完成:{}", toExprText(expr));
         return expr;
+    }
+
+    private void handleAssign(Node headNode) {
+        if (headNode.getChildren() == null) return;
+        ListIterator<Node> iterator = headNode.getChildren().listIterator(headNode.getChildren().size());
+        Node preNode = null;
+        while (iterator.hasPrevious()) {
+            Node node = iterator.previous();
+            if (node.getType() == NodeType.ASSIGN) {
+                if (preNode == null || preNode.getType() != NodeType.EXPR
+                        || preNode.getType() != NodeType.VAR || preNode.getType() != NodeType.NUMBER) {
+                    throw new IllegalArgumentException("赋值语句右值不是一个值:" + node);
+                }
+                Node varNode;
+                if (!(iterator.hasPrevious() && (varNode = iterator.previous()).getType() == NodeType.VAR)) {
+                    throw new IllegalArgumentException("赋值语句左值不是变量:" + node);
+                }
+                iterator.remove();
+                node.setToken(varNode.getToken() + node.getToken());
+                node.setRowBegin(varNode.getRowBegin());
+            }
+            preNode = node;
+        }
     }
 
     // 处理连续的符号
@@ -206,7 +231,8 @@ public class Evaluate {
         children.add(preNode);
         while (iterator.hasNext()) {
             Node node = iterator.next();
-            if (preNode.getType() == NodeType.OPERATOR && node.getType() == NodeType.OPERATOR) {
+            if ((preNode.getType() == NodeType.OPERATOR || preNode.getType() == NodeType.ASSIGN)
+                    && node.getType() == NodeType.OPERATOR) {
                 if (specialTokens.contains(node.getToken()) && iterator.hasNext()) {
                     Node next = iterator.next();
                     if (next.getType() != NodeType.OPERATOR) {
@@ -262,9 +288,12 @@ public class Evaluate {
             }
             return result;
         } else if (headNode.getType() == NodeType.ASSIGN) {
-            String valName = headNode.getChildren().get(0).getToken();
+            Node varNode = headNode.getChildren().get(0);
+            if (varNode.getType() != NodeType.VAR) {
+                throw new IllegalArgumentException("赋值语句左侧不是变量:" + headNode);
+            }
             BigDecimal result = calculate(headNode.getChildren().get(1));
-            putVar(valName, result);
+            putVar(varNode.getToken(), result);
             return result;
         } else {
             throw new IllegalArgumentException("无效的token:" + headNode);
