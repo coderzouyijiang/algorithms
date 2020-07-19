@@ -4,11 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -16,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -203,6 +206,7 @@ public class Evaluate {
     public BigDecimal evaluate(String exprText) {
         Expr expr = parseExpr(exprText);
         BigDecimal result = calculate(expr);
+        log.info("计算完成:{}={}", result, toExprText(expr, varMap));
         return result;
     }
 
@@ -266,28 +270,40 @@ public class Evaluate {
     }
 
     public static String toExprText(Node headNode) {
-        if (headNode.getChildren() == null || headNode.getChildren().isEmpty()) {
-            return headNode.getToken();
-        } else if (headNode.getType() == NodeType.OPERATOR) {
+        return toExprText(headNode, Collections.EMPTY_MAP);
+    }
+
+    public static String toExprText(Node headNode, Map<String, BigDecimal> varMap) {
+        if (headNode.getType() == NodeType.OPERATOR) {
+            if (headNode.getChildren() == null || headNode.getChildren().isEmpty()) {
+                return headNode.getToken();
+            }
             Operator operator = token2Operator.get(headNode.getToken());
             Iterator<Node> iterator = headNode.getChildren().iterator();
             List<Node> lefts = new LinkedList<>(), rights = new LinkedList<>();
             for (int i = 0; i < operator.getLeftArgNum(); i++) lefts.add(iterator.next());
             for (int i = 0; i < operator.getRightArgNum(); i++) rights.add(iterator.next());
-            return "(" + nodesToStr(lefts) + headNode.getToken() + nodesToStr(rights) + ")";
-        } else if (headNode.getType() == NodeType.NUMBER || headNode.getType() == NodeType.VAR) {
+            return "(" + nodesToStr(lefts, varMap) + headNode.getToken() + nodesToStr(rights, varMap) + ")";
+        } else if (headNode.getType() == NodeType.NUMBER) {
             return headNode.getToken();
+        } else if (headNode.getType() == NodeType.VAR) {
+            BigDecimal val = varMap.get(headNode.getToken());
+            return (val != null ? (val + "@") : "") + headNode.getToken();
         } else {
-            return nodesToStr(headNode.getChildren());
+            return nodesToStr(headNode.getChildren(), varMap);
         }
     }
 
     private static String nodesToStr(List<Node> nodes) {
+        return nodesToStr(nodes, Collections.EMPTY_MAP);
+    }
+
+    private static String nodesToStr(List<Node> nodes, Map<String, BigDecimal> varMap) {
         if (nodes == null || nodes.isEmpty()) return "";
         if (nodes.size() == 1) {
-            return Evaluate.toExprText(nodes.get(0));
+            return Evaluate.toExprText(nodes.get(0), varMap);
         } else {
-            return nodes.stream().map(Evaluate::toExprText).collect(Collectors.joining(",", "(", ")"));
+            return nodes.stream().map(it -> toExprText(it, varMap)).collect(Collectors.joining(",", "{", "}"));
         }
     }
 
