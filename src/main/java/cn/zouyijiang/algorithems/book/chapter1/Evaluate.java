@@ -39,7 +39,8 @@ public class Evaluate {
         EXPR("表达式"),
         VAR("变量"),
         ASSIGN("赋值"), // 右结合
-        END("赋值"); // 结束符号
+        END("赋值"), // 结束符号
+        FUNCTION("函数"); // 函数
 
         private final String name;
     }
@@ -54,7 +55,7 @@ public class Evaluate {
         private int rowEnd;
         private List<Node> children;
 
-        private List<String> varNames;
+//        private List<String> varNames;
 //        private Node left;
 //        private Node right;
 
@@ -185,7 +186,7 @@ public class Evaluate {
         log.info("处理操作符*、/完成:{}", toExprText(expr));
         handleOperator(expr, true, new HashSet<>(Arrays.asList("+", "-")));
         log.info("处理操作符+、-完成:{}", toExprText(expr));
-        handleOperator(expr, true, new HashSet<>(Arrays.asList("=")));
+        handleOperator(expr, false, new HashSet<>(Arrays.asList("=")));
         log.info("处理赋值=完成:{}", toExprText(expr));
         return expr;
     }
@@ -376,7 +377,7 @@ public class Evaluate {
         if (parentNode.getChildren().size() == 1) {
             return handleOperator(parentNode.getChildren().get(0), isStartLeft, operatorTokens);
         }
-//        log.info("handleOperator:parent={},children={}", parentNode, parentNode.getChildren());
+//        log.info("handleOperator111:parent={},children={}", parentNode, nodesToStr(parentNode.getChildren()));
         LinkedList<Node> children = new LinkedList<>();
         Iterator<Node> iterator = getIterator(parentNode.getChildren(), isStartLeft);
         while (iterator.hasNext()) {
@@ -387,13 +388,15 @@ public class Evaluate {
                     throw new IllegalArgumentException("token不合法:" + node);
                 }
                 LinkedList<Node> argNodes = new LinkedList<>();
-                for (int i = operator.getLeftArgNum() - 1; i >= 0; i--) {
+                int argNum1 = isStartLeft ? operator.getLeftArgNum() : operator.getRightArgNum();
+                for (int i = 0; i < argNum1; i++) {
                     if (children.isEmpty()) {
                         throw new IllegalArgumentException(node.getType().getName() + (isStartLeft ? "左" : "右") + "侧参数缺失:" + node);
                     }
                     argNodes.add(isStartLeft ? 0 : argNodes.size(), children.removeLast()); // 从左往右遍历,右侧参数已处理过
                 }
-                for (int i = 0; i < operator.getRightArgNum(); i++) {
+                int argNum2 = isStartLeft ? operator.getRightArgNum() : operator.getLeftArgNum();
+                for (int i = 0; i < argNum2; i++) {
                     if (!iterator.hasNext()) {
                         throw new IllegalArgumentException(node.getType().getName() + (isStartLeft ? "右" : "左") + "侧参数缺失:" + node);
                     }
@@ -403,10 +406,10 @@ public class Evaluate {
                 children.add(node);
             } else {
                 node = handleOperator(node, isStartLeft, operatorTokens);
-                children.add(node);
+                children.add(isStartLeft ? children.size() : 0, node);
             }
         }
-//        log.info("handleOperator:parent={},children2={}", parentNode, children);
+//        log.info("handleOperator222:parent={},children={}", parentNode, nodesToStr(children));
         parentNode.setChildren(children);
         while (parentNode.getChildren() != null && parentNode.getChildren().size() == 1) {
             parentNode = parentNode.getChildren().get(0);

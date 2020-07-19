@@ -86,9 +86,14 @@ public class Test2_evaluate {
         Evaluate evaluate = new Evaluate();
         int a = 9;
         evaluate.putVar("a", new BigDecimal(9));
-        int x, y = (x = a + 1);
-        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("y=(x=a+1)"));
+        int x, y = (x = a - 1/2);
+        log.info("result:x={},y={};{}", x, y, evaluate.evaluate("y=x=a-1/2"));
+//        evaluate.evaluate("a1=1,a2=3,a3=6,a4=a1+a2*a3");
+        int z;
+        y = 1 + (x = z = a - 6);
+        log.info("result:y={},x={},z={};{}", y, x, z, evaluate.evaluate("y=1+(x=z=a-6)"));
         log.info("vars={}", evaluate.getVars());
     }
+
 
 }
