@@ -86,7 +86,7 @@ public class Test2_evaluate {
         Evaluate evaluate = new Evaluate();
         int a = 9;
         evaluate.putVar("a", new BigDecimal(9));
-        int x, y = (x = a - 1/2);
+        int x, y = (x = a - 1 / 2);
         log.info("result:x={},y={};{}", x, y, evaluate.evaluate("y=x=a-1/2"));
 //        evaluate.evaluate("a1=1,a2=3,a3=6,a4=a1+a2*a3");
         int z;
@@ -95,5 +95,14 @@ public class Test2_evaluate {
         log.info("vars={}", evaluate.getVars());
     }
 
+    @Test
+    public void test_function() {
+        Evaluate evaluate = new Evaluate();
+        int a = 9;
+        evaluate.putVar("a", new BigDecimal(9));
 
+        log.info("result:{}", evaluate.evaluate("area(2,5)"));
+//        log.info("result:{}", evaluate.evaluate("area(2)"));
+        log.info("vars={}", evaluate.getVars());
+    }
 }
