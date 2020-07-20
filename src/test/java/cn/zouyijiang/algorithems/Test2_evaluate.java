@@ -95,6 +95,10 @@ public class Test2_evaluate {
         log.info("vars={}", evaluate.getVars());
     }
 
+    private int area(int a, int b) {
+        return a * b;
+    }
+
     @Test
     public void test_function() {
         Evaluate evaluate = new Evaluate();
@@ -103,7 +107,7 @@ public class Test2_evaluate {
 
 //        log.info("result:{}", evaluate.evaluate("area(2,5)"));
 //        log.info("result:{}", evaluate.evaluate("area(2)"));
-        log.info("result:{}", evaluate.evaluate("a+-area(2,5)-3^2"));
+        log.info("result:{};{}", a + -area(2, 4 + (2 - 1)) - Math.pow(3, 2), evaluate.evaluate("a+-area(2,4+(2-1))-3^2"));
         log.info("vars={}", evaluate.getVars());
     }
 }

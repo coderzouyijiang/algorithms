@@ -401,7 +401,9 @@ public class Evaluate {
             Iterator<Node> iterator = headNode.getChildren().iterator();
             String str = headNode.getToken() + "(";
             while (argNameIterator.hasNext()) {
-                str += argNameIterator.next() + "=" + exprToStr(iterator.next()) + (argNameIterator.hasNext() ? "," : ")");
+//                str += argNameIterator.next() + "=" + exprToStr(iterator.next()) + (argNameIterator.hasNext() ? "," : ")");
+                argNameIterator.next();
+                str += exprToStr(iterator.next()) + (argNameIterator.hasNext() ? "," : ")");
             }
             return str;
         } else if (headNode.getType() == NodeType.NUMBER) {
