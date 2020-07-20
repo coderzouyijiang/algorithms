@@ -518,15 +518,15 @@ public class Evaluate {
                     // 如果前面有一个变量，视为函数
                     LinkedList<Node> children = (LinkedList<Node>) preLeft.getChildren();
                     Node varNode;
-                    if (children.size() > 0 && (varNode = children.pop()) != null) {
+                    if (children.size() > 0 && (varNode = children.pollLast()) != null) {
                         if (varNode.getType() != NodeType.VAR) {
-                            children.push(varNode);
+                            children.add(varNode);
                         } else {
                             leftNode.setToken(varNode.getToken());
                             leftNode.setType(NodeType.FUNCTION);
                         }
                     }
-                    children.push(leftNode);
+                    children.add(leftNode);
                     leftNode = preLeft;
                 } else {
                     deque.push(leftNode);

@@ -101,8 +101,9 @@ public class Test2_evaluate {
         int a = 9;
         evaluate.putVar("a", new BigDecimal(9));
 
-        log.info("result:{}", evaluate.evaluate("area(2,5)"));
+//        log.info("result:{}", evaluate.evaluate("area(2,5)"));
 //        log.info("result:{}", evaluate.evaluate("area(2)"));
+        log.info("result:{}", evaluate.evaluate("a+-area(2,5)-3^2"));
         log.info("vars={}", evaluate.getVars());
     }
 }
