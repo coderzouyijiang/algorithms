@@ -107,7 +107,8 @@ public class Test2_evaluate {
 
 //        log.info("result:{}", evaluate.evaluate("area(2,5)"));
 //        log.info("result:{}", evaluate.evaluate("area(2)"));
-        log.info("result:{};{}", a + -area(2, 4 + (2 - 1)) - Math.pow(3, 2), evaluate.evaluate("a+-area(2,4+(2-1))-3^2"));
+        log.info("result:{};{}", a + -area(2, 4 + (2 - 1)) - Math.pow(3, 2), evaluate.evaluate("abc=a+-area(2,4+(2-1))-3^2"));
         log.info("vars={}", evaluate.getVars());
+        log.info("" + evaluate.evaluate("abc(10)"));
     }
 }

@@ -21,6 +21,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -162,8 +163,8 @@ public class Evaluate {
         token2Func.put("^", list -> BigDecimal.valueOf(Math.pow(list.get(0).doubleValue(), list.get(1).doubleValue())));
 
         varMap = new LinkedHashMap<>();
-        varMap.put("e", new BigDecimal(Math.E));
-        varMap.put("pi", new BigDecimal(Math.PI));
+        putVar("e", new BigDecimal(Math.E));
+        putVar("pi", new BigDecimal(Math.PI));
 
         exprMap = new LinkedHashMap<>();
         exprMap.put("area", parseExpr("a*b"));
@@ -196,6 +197,21 @@ public class Evaluate {
         log.info("处理操作符+、-完成:{}", exprToStr(expr));
         handleOperator(expr, false, new HashSet<>(Arrays.asList("=")));
         log.info("处理赋值=完成:{}", exprToStr(expr));
+        if (expr.getChildren() != null && expr.getChildren().size() > 0) {
+            Node firstNode = expr.getChildren().get(0);
+            if (firstNode.getType() == NodeType.ASSIGN) {
+                Node varNode = firstNode.getChildren().get(0);
+                expr.setName(varNode.getToken());
+                /*
+                Node valNode = firstNode.getChildren().get(1);
+                Expr valExpr = new Expr(valNode.getType(), valNode.getToken(), exprText.substring(valNode.getRowBegin(), valNode.getRowEnd()));
+                valExpr.setArgNames(expr.getArgNames());
+                valExpr.setName(varNode.getToken());
+                valExpr.setChildren();
+                */
+                exprMap.put(varNode.getToken(), expr);
+            }
+        }
         return expr;
     }
 
@@ -209,8 +225,12 @@ public class Evaluate {
         if (headNode.getType() == NodeType.VAR) {
             varNames.add(headNode.getToken());
         } else if (headNode.getChildren() != null) {
-            for (Node node : headNode.getChildren()) {
-                findVarNames(node, varNames);
+            Iterator<Node> iterator = headNode.getChildren().iterator();
+            if (headNode.getType() == NodeType.ASSIGN && iterator.hasNext()) {
+                iterator.next();
+            }
+            while (iterator.hasNext()) {
+                findVarNames(iterator.next(), varNames);
             }
         }
     }
@@ -308,9 +328,9 @@ public class Evaluate {
             Node result = null;
             for (Node node : headNode.getChildren()) {
                 result = calculate(node, varMap);
-                if (node.getType() != NodeType.ASSIGN) {
-                    putTempVar(new BigDecimal(result.getToken()));
-                }
+//                if (node.getType() != NodeType.ASSIGN) {
+//                    putTempVar(new BigDecimal(result.getToken()));
+//                }
             }
             return result;
         } else if (headNode.getType() == NodeType.FUNCTION) {
@@ -329,7 +349,7 @@ public class Evaluate {
                 argMap.put(argIterator.next(), new BigDecimal(calculate(childIterator.next(), varMap).getToken()));
             }
             Node result = calculate(expr, argMap);
-            putTempVar(new BigDecimal(result.getToken()));
+//            putTempVar(new BigDecimal(result.getToken()));
             return result;
         } else if (headNode.getType() == NodeType.ASSIGN) {
             Node varNode = headNode.getChildren().get(0);
@@ -344,13 +364,20 @@ public class Evaluate {
         }
     }
 
-    private void putTempVar(BigDecimal val) {
-        Integer maxKey = varMap.keySet().stream().filter(it -> it.matches("\\$[0-9]+"))
-                .map(it -> Integer.valueOf(it.substring(1))).max(Integer::compareTo).orElse(0);
-        varMap.put("$" + (maxKey + 1), val);
+    private AtomicInteger tempVarIndex = new AtomicInteger(0);
+
+    private String getTempVarName() {
+        return "$" + tempVarIndex.incrementAndGet();
     }
 
     public void putVar(String name, BigDecimal val) {
+//        Integer maxKey = varMap.keySet().stream().filter(it -> it.matches("\\$[0-9]+"))
+//                -                .map(it -> Integer.valueOf(it.substring(1))).max(Integer::compareTo).orElse(0);
+        if (name.matches("\\$[0-9]+")) {
+            Integer index = Integer.valueOf(name.substring(1));
+            for (int maxIndex; index > (maxIndex = tempVarIndex.get()) || !tempVarIndex.compareAndSet(maxIndex, index); ) {
+            }
+        }
         varMap.put(name, val);
     }
 
