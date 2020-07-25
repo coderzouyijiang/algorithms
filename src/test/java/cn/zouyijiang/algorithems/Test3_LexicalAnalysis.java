@@ -1,5 +1,6 @@
 package cn.zouyijiang.algorithems;
 
+import cn.zouyijiang.algorithems.book.chapter1.GrammarAnalysis;
 import cn.zouyijiang.algorithems.book.chapter1.LexicalAnalysis;
 import cn.zouyijiang.algorithems.book.chapter1.TokenType;
 import cn.zouyijiang.algorithems.book.chapter1.Word;
@@ -11,12 +12,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,7 +48,9 @@ public class Test3_LexicalAnalysis {
                 .map(it -> it.getValue()).collect(Collectors.joining());
         log.info("trimText:\n{}", trimText);
 
+        GrammarAnalysis grammerAnalysis = new GrammarAnalysis();
+        grammerAnalysis.handle(words);
+        log.info("");
     }
-
 
 }

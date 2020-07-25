@@ -18,7 +18,9 @@ public enum TokenType {
     DECIMAL_RADIX2(8, "二进制数字"),
     DECIMAL_RADIX16(9, "十六进制数字"),
     DECIMAL_RADIX8(10, "八进制数字"),
-    DECIMAL_RADIX10(11, "十进制数字");
+    DECIMAL_RADIX10(11, "十进制数字"),
+
+    BRACKETS(1001, "括号");
 
     private final int code;
     private final String name;

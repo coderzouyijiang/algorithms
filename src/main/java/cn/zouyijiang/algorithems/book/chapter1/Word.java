@@ -3,6 +3,7 @@ package cn.zouyijiang.algorithems.book.chapter1;
 import lombok.Data;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 public class Word {
@@ -26,4 +27,9 @@ public class Word {
     public String toString() {
         return TokenType.codeOf(typeId) + "[" + start + "," + end + "):【" + value + "】";
     }
+
+    public static String joinWords(List<Word> words) {
+        return words.stream().map(it -> it.getValue()).collect(Collectors.joining());
+    }
 }
+
