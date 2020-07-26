@@ -20,7 +20,12 @@ public enum TokenType {
     DECIMAL_RADIX8(10, "八进制数字"),
     DECIMAL_RADIX10(11, "十进制数字"),
 
-    BRACKETS(1001, "括号");
+    BRACKETS(1001, "括号"),
+    COMPLEX_VARIABLE(1002, "复合变量"),
+    METHOD_CALL(1003, "方法调用调用"),
+    EXPR(1004, "表达式"),
+
+    NONE(999999, "");
 
     private final int code;
     private final String name;

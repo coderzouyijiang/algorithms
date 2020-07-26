@@ -30,12 +30,12 @@ public class Test3_LexicalAnalysis {
 
     @Test
     public void test() {
-        String text = "max  (0712+ max (1.1, d),Math.abs(b))+ pow(x,0xABc)+0+0b1_01*0x3Ffa+01234567+1-1.2/0.1+\"+a+\"\n" +
-                " a+\"k\"+c\n" +
-                " \"kk\"k\" /* kdfdk /* kdfdk */ +8888 +9999\n" +
-                " \"k1\"+\"k2\\\"k3\\\"\"\n" +
-                " max(a,b)+ /*min(c,d);*/ min(c2,d2)\n" +
-                " \t  \t a+2-4 // max(a,b)+ /*min(c,d);*/ min(c2,d2)\n";
+        String text = "max  (0712+ max (1.1, d),Math.abs(b))+ pow(x,0xABc)+0+0b1_01*0x3Ffa+01234567+1-1.2/0.1+\"+a+\";\n" +
+                " a+\"k\"+c;\n" +
+                " \"kk\"-k /* kdfdk /* kdfdk */ +8888 +9999;\n" +
+                " \"k1\"+\"k2\\\"k3\\\"\";\n" +
+                " max(a,b)+ /*min(c,d);*/ min(c2,d2);\n" +
+                " \t  \t a+2-4; // max(a,b)+ /*min(c,d);*/ min(c2,d2);\n";
 
         lexicalAnalysis.handle(text);
         List<Word> words = lexicalAnalysis.getWords();

@@ -80,7 +80,7 @@ public class LexicalAnalysis {
                 // 任意个空白字符，与 [ \f\n\r\t\v] 等效。
                 new LexicalPattern(TokenType.BLANK, "\\s+"),
                 // 字符串中，只能有\"或其他字符。可能多个字符串在一行，按最短匹配
-                new LexicalPattern(TokenType.STRING, "\"(\\\\\"|.)*?\""),
+                new LexicalPattern(TokenType.STRING, "\"(\\\\\"|[^\"])*?\""),
                 // 单行注释，一直到行尾，按最长匹配。最后的回车换行符不匹配
                 new LexicalPattern(TokenType.NOTE_SINGLE, "//.*(?=\r?\n)"),
                 // 行内注释
@@ -88,7 +88,7 @@ public class LexicalAnalysis {
                 // 变量，函数名
                 new LexicalPattern(TokenType.VARIABLE, "[a-zA-Z_$][\\w$]*"),
                 // 预定义符号
-                new LexicalPattern(TokenType.SIGN, "[,;\\.\\(\\)<>\\+\\-\\*/\\^%=!\\?:\"]"),
+                new LexicalPattern(TokenType.SIGN, "[,;\\.\\(\\)<>\\+\\-\\*/\\^%=!\\?:]"),
                 // 数字字面量
 //                new LexicalPattern(TokenType.DECIMAL, "\\d\\S+"),
                 new LexicalPattern(TokenType.DECIMAL_RADIX2, "0[bB][01](_*[01])*"),
